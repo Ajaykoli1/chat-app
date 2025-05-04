@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Live Chat App</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <!-- Auth Container -->
+  <div class="auth-container" id="auth-container">
+    <div class="auth-box">
+      <div class="auth-header">
+        <h2>Welcome to Live Chat</h2>
+        <div class="auth-tabs">
+          <button class="auth-tab active" onclick="showTab('login')">Login</button>
+          <button class="auth-tab" onclick="showTab('register')">Register</button>
+        </div>
+      </div>
+      
+      <!-- Login Form -->
+      <form id="login-form" class="auth-form">
+        <input type="text" id="login-username" placeholder="Username" required />
+        <input type="password" id="login-password" placeholder="Password" required />
+        <button type="submit">Login</button>
+      </form>
+
+      <!-- Registration Form -->
+      <form id="register-form" class="auth-form" style="display: none;">
+        <input type="text" id="register-username" placeholder="Choose Username" required />
+        <input type="password" id="register-password" placeholder="Choose Password" required />
+        <input type="password" id="confirm-password" placeholder="Confirm Password" required />
+        <button type="submit">Register</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Chat Container (Hidden initially) -->
+  <div class="chat-wrapper" id="chat-wrapper" style="display: none;">
+    <div class="chat-header">
+      💬 Live Chat
+      <button class="logout-btn" onclick="logout()">Logout</button>
+    </div>
+    <div class="chat-box" id="chat-box"></div>
+    <div id="typing-status"></div>
+    <div class="chat-form">
+      <input type="text" id="message" placeholder="Type your message..." />
+      <button onclick="sendMessage()">Send</button>
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="client.js"></script>
+</body>
+</html>
