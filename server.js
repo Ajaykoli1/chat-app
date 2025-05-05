@@ -3,12 +3,55 @@ const http = require('http');
 const socketIo = require('socket.io');
 const { Pool } = require('pg');
 const bcrypt = require('bcryptjs');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
+require('dotenv').config();
 
 const app = express();
 const server = http.createServer(app);
 const io = socketIo(server);
 
 app.use(express.json());
+
+// Configure multer for file uploads
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    const uploadDir = 'public/uploads';
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+    cb(null, uploadDir);
+  },
+  filename: function (req, file, cb) {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, uniqueSuffix + path.extname(file.originalname));
+  }
+});
+
+const upload = multer({
+  storage: storage,
+  limits: {
+    fileSize: 5 * 1024 * 1024 // 5MB limit
+  },
+  fileFilter: function (req, file, cb) {
+    // Allow images and common document types
+    const allowedTypes = [
+      'image/jpeg',
+      'image/png',
+      'image/gif',
+      'application/pdf',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'text/plain'
+    ];
+    if (allowedTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Invalid file type'));
+    }
+  }
+});
 
 // PostgreSQL connection setup
 const pool = new Pool({
@@ -28,6 +71,21 @@ pool.connect((err, client, release) => {
 
 // Serve static files from the public folder
 app.use(express.static('public'));
+
+// File upload endpoint
+app.post('/upload', upload.single('file'), (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: 'No file uploaded' });
+  }
+  
+  const fileUrl = `/uploads/${req.file.filename}`;
+  res.json({
+    success: true,
+    fileUrl: fileUrl,
+    fileName: req.file.originalname,
+    fileType: req.file.mimetype
+  });
+});
 
 // Registration endpoint
 app.post('/register', async (req, res) => {
@@ -115,7 +173,7 @@ io.on('connection', (socket) => {
 
   // Send last 20 messages to the newly connected client
   pool.query(
-    'SELECT "user", msg, created_at FROM messages ORDER BY id DESC LIMIT 20',
+    'SELECT "user", msg, created_at, file_url, file_name, file_type FROM messages ORDER BY id DESC LIMIT 20',
     (err, results) => {
       if (!err) {
         socket.emit('chat history', results.rows.reverse());
@@ -129,8 +187,8 @@ io.on('connection', (socket) => {
     try {
       // Save message to DB
       await pool.query(
-        'INSERT INTO messages ("user", msg) VALUES ($1, $2)',
-        [data.user, data.msg]
+        'INSERT INTO messages ("user", msg, file_url, file_name, file_type) VALUES ($1, $2, $3, $4, $5)',
+        [data.user, data.msg, data.fileUrl, data.fileName, data.fileType]
       );
       io.emit('chat message', data);
     } catch (err) {
@@ -144,7 +202,7 @@ io.on('connection', (socket) => {
 
   socket.on('request chat history', () => {
     pool.query(
-      'SELECT "user", msg, created_at FROM messages ORDER BY id DESC LIMIT 20',
+      'SELECT "user", msg, created_at, file_url, file_name, file_type FROM messages ORDER BY id DESC LIMIT 20',
       (err, results) => {
         if (!err) {
           socket.emit('chat history', results.rows.reverse());

@@ -219,3 +219,113 @@ function logout() {
     clearButton.remove();
   }
 }
+
+// Add file upload handling
+const fileInput = document.getElementById('file-input');
+const fileBtn = document.querySelector('.file-btn');
+
+fileBtn.addEventListener('click', () => {
+    fileInput.click();
+});
+
+fileInput.addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    // Check file size (5MB limit)
+    if (file.size > 5 * 1024 * 1024) {
+        alert('File size must be less than 5MB');
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('username', currentUser);
+
+    try {
+        const response = await fetch('/upload', {
+            method: 'POST',
+            body: formData
+        });
+
+        const data = await response.json();
+        if (data.success) {
+            // Emit the file message
+            socket.emit('chat message', {
+                username: currentUser,
+                message: data.fileUrl,
+                fileUrl: data.fileUrl,
+                fileName: data.fileName,
+                fileType: data.fileType
+            });
+        } else {
+            alert('Error uploading file: ' + data.error);
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert('Error uploading file');
+    }
+
+    // Clear the file input
+    fileInput.value = '';
+});
+
+// Update the message display function to handle files
+function addMessage(msg) {
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `message ${msg.username === currentUser ? 'sent' : 'received'}`;
+    
+    const header = document.createElement('div');
+    header.className = 'message-header';
+    header.textContent = msg.username;
+    messageDiv.appendChild(header);
+
+    if (msg.fileUrl) {
+        const fileContent = document.createElement('div');
+        fileContent.className = 'file-content';
+
+        if (msg.fileType.startsWith('image/')) {
+            const img = document.createElement('img');
+            img.src = msg.fileUrl;
+            img.className = 'file-preview';
+            img.alt = msg.fileName;
+            fileContent.appendChild(img);
+        } else {
+            const fileAttachment = document.createElement('div');
+            fileAttachment.className = 'file-attachment';
+            
+            const icon = document.createElement('img');
+            icon.src = getFileIcon(msg.fileType);
+            icon.alt = 'File icon';
+            
+            const link = document.createElement('a');
+            link.href = msg.fileUrl;
+            link.textContent = msg.fileName;
+            link.target = '_blank';
+            
+            fileAttachment.appendChild(icon);
+            fileAttachment.appendChild(link);
+            fileContent.appendChild(fileAttachment);
+        }
+        
+        messageDiv.appendChild(fileContent);
+    }
+
+    if (msg.message) {
+        const content = document.createElement('div');
+        content.className = 'message-content';
+        content.textContent = msg.message;
+        messageDiv.appendChild(content);
+    }
+
+    chatBox.appendChild(messageDiv);
+    chatBox.scrollTop = chatBox.scrollHeight;
+}
+
+// Helper function to get file icon based on type
+function getFileIcon(fileType) {
+    if (fileType.startsWith('image/')) return '/icons/image.png';
+    if (fileType === 'application/pdf') return '/icons/pdf.png';
+    if (fileType.includes('document') || fileType.includes('text')) return '/icons/document.png';
+    return '/icons/file.png';
+}

@@ -11,6 +11,9 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE TABLE IF NOT EXISTS messages (
     id SERIAL PRIMARY KEY,
     "user" VARCHAR(50) NOT NULL,
-    msg TEXT NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    msg TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    file_url VARCHAR(255),
+    file_name VARCHAR(255),
+    file_type VARCHAR(100)
 ); 
