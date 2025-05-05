@@ -69,9 +69,42 @@ app.post('/login', async (req, res) => {
     if (!bcrypt.compareSync(password, user.password)) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
-    res.json({ success: true, username: user.username });
+    res.json({ 
+      success: true, 
+      username: user.username,
+      isAdmin: user.is_admin 
+    });
   } catch (err) {
     console.error('Login error:', err);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+// Clear chat history endpoint (admin only)
+app.post('/clear-chat-history', async (req, res) => {
+  const { username, isAdmin } = req.body;
+  
+  if (!username || !isAdmin) {
+    return res.status(403).json({ error: 'Unauthorized' });
+  }
+
+  try {
+    // Verify user is admin
+    const result = await pool.query(
+      'SELECT is_admin FROM users WHERE username = $1',
+      [username]
+    );
+
+    if (result.rows.length === 0 || !result.rows[0].is_admin) {
+      return res.status(403).json({ error: 'Unauthorized' });
+    }
+
+    // Clear messages
+    await pool.query('DELETE FROM messages');
+    io.emit('chat history', []); // Notify all clients to clear their chat display
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Error clearing chat history:', err);
     res.status(500).json({ error: 'Database error' });
   }
 });

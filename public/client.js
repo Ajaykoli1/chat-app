@@ -6,6 +6,7 @@ const authContainer = document.getElementById("auth-container");
 const chatWrapper = document.getElementById("chat-wrapper");
 
 let currentUser = null;
+let isAdmin = false;
 
 // Auth Functions
 function showTab(tab) {
@@ -41,9 +42,14 @@ document.getElementById("login-form").addEventListener("submit", async (e) => {
     const data = await response.json();
     if (data.success) {
       currentUser = username;
+      isAdmin = data.isAdmin;
       showChat();
-      console.log('Requesting chat history after login...');
       socket.emit('request chat history');
+      
+      // Add admin clear button if user is admin
+      if (isAdmin) {
+        addAdminClearButton();
+      }
     } else {
       alert(data.error || "Login failed");
     }
@@ -92,10 +98,72 @@ function showChat() {
 
 function logout() {
   currentUser = null;
+  isAdmin = false;
   chatWrapper.style.display = "none";
   authContainer.style.display = "block";
   document.getElementById("login-form").reset();
   document.getElementById("register-form").reset();
+  
+  // Remove admin clear button if it exists
+  const clearButton = document.getElementById('admin-clear-button');
+  if (clearButton) {
+    clearButton.remove();
+  }
+}
+
+// Admin Functions
+function addAdminClearButton() {
+  // Remove existing button if any
+  const existingButton = document.getElementById('admin-clear-button');
+  if (existingButton) {
+    existingButton.remove();
+  }
+
+  const clearButton = document.createElement('button');
+  clearButton.id = 'admin-clear-button';
+  clearButton.textContent = 'Clear Chat History';
+  clearButton.style.position = 'absolute';
+  clearButton.style.top = '10px';
+  clearButton.style.right = '10px';
+  clearButton.style.padding = '5px 10px';
+  clearButton.style.background = '#dc3545';
+  clearButton.style.color = 'white';
+  clearButton.style.border = 'none';
+  clearButton.style.borderRadius = '4px';
+  clearButton.style.cursor = 'pointer';
+  clearButton.onclick = clearChatHistory;
+
+  document.querySelector('.chat-header').appendChild(clearButton);
+}
+
+async function clearChatHistory() {
+  if (!isAdmin) {
+    alert('Only administrators can clear chat history');
+    return;
+  }
+
+  if (!confirm('Are you sure you want to clear all chat history? This action cannot be undone.')) {
+    return;
+  }
+
+  try {
+    const response = await fetch('/clear-chat-history', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: currentUser, isAdmin })
+    });
+
+    const data = await response.json();
+    if (data.success) {
+      chatBox.innerHTML = '';
+      console.log('Chat history cleared successfully');
+    } else {
+      alert(data.error || 'Failed to clear chat history');
+    }
+  } catch (err) {
+    console.error('Error clearing chat history:', err);
+    alert('Error clearing chat history');
+  }
 }
 
 // Chat Functions
@@ -148,3 +216,26 @@ socket.on("chat history", (messages) => {
   });
   chatBox.scrollTop = chatBox.scrollHeight;
 });
+
+// Add a function to clear chat display
+function clearChatDisplay() {
+  chatBox.innerHTML = "";
+  console.log('Chat display cleared');
+}
+
+// Add a button to clear chat display
+const clearChatButton = document.createElement('button');
+clearChatButton.textContent = 'Clear Chat';
+clearChatButton.style.position = 'absolute';
+clearChatButton.style.top = '10px';
+clearChatButton.style.right = '10px';
+clearChatButton.style.padding = '5px 10px';
+clearChatButton.style.background = '#dc3545';
+clearChatButton.style.color = 'white';
+clearChatButton.style.border = 'none';
+clearChatButton.style.borderRadius = '4px';
+clearChatButton.style.cursor = 'pointer';
+clearChatButton.onclick = clearChatDisplay;
+
+// Add the button to the chat header
+document.querySelector('.chat-header').appendChild(clearChatButton);
