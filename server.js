@@ -82,10 +82,12 @@ io.on('connection', (socket) => {
 
   // Send last 20 messages to the newly connected client
   pool.query(
-    'SELECT user, msg, created_at FROM messages ORDER BY id DESC LIMIT 20',
+    'SELECT "user", msg, created_at FROM messages ORDER BY id DESC LIMIT 20',
     (err, results) => {
       if (!err) {
         socket.emit('chat history', results.rows.reverse());
+      } else {
+        console.error('Error fetching chat history:', err);
       }
     }
   );
@@ -94,7 +96,7 @@ io.on('connection', (socket) => {
     try {
       // Save message to DB
       await pool.query(
-        'INSERT INTO messages (user, msg) VALUES ($1, $2)',
+        'INSERT INTO messages ("user", msg) VALUES ($1, $2)',
         [data.user, data.msg]
       );
       io.emit('chat message', data);
@@ -109,10 +111,12 @@ io.on('connection', (socket) => {
 
   socket.on('request chat history', () => {
     pool.query(
-      'SELECT user, msg, created_at FROM messages ORDER BY id DESC LIMIT 20',
+      'SELECT "user", msg, created_at FROM messages ORDER BY id DESC LIMIT 20',
       (err, results) => {
         if (!err) {
           socket.emit('chat history', results.rows.reverse());
+        } else {
+          console.error('Error fetching chat history:', err);
         }
       }
     );

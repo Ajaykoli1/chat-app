@@ -101,11 +101,13 @@ function sendMessage() {
   const msg = messageInput.value.trim();
   if (!msg || !currentUser) return;
 
+  console.log('Sending message:', { user: currentUser, msg });
   socket.emit("chat message", { user: currentUser, msg });
   messageInput.value = "";
 }
 
 socket.on("chat message", ({ user, msg }) => {
+  console.log('Received message:', { user, msg });
   const msgEl = document.createElement("p");
   msgEl.textContent = `${user}: ${msg}`;
   msgEl.classList.add(user === currentUser ? "sent" : "received");
@@ -128,6 +130,7 @@ socket.on("typing", (user) => {
 });
 
 socket.on("chat history", (messages) => {
+  console.log('Received chat history:', messages);
   chatBox.innerHTML = "";
   messages.forEach(({ user, msg }) => {
     const msgEl = document.createElement("p");
