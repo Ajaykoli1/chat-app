@@ -1,241 +1,221 @@
-let socket = io();
-let username = '';
+const socket = io(window.location.origin);
+const chatBox = document.getElementById("chat-box");
+const messageInput = document.getElementById("message");
+const typingStatus = document.getElementById("typing-status");
+const authContainer = document.getElementById("auth-container");
+const chatWrapper = document.getElementById("chat-wrapper");
+
+let currentUser = null;
 let isAdmin = false;
-let typingTimeout;
 
-// DOM Elements
-const authContainer = document.getElementById('auth-container');
-const chatWrapper = document.getElementById('chat-wrapper');
-const loginForm = document.getElementById('login-form');
-const registerForm = document.getElementById('register-form');
-const chatBox = document.getElementById('chat-box');
-const messageInput = document.getElementById('message');
-const typingStatus = document.getElementById('typing-status');
-
-// Show/Hide Auth Tabs
+// Auth Functions
 function showTab(tab) {
-  const tabs = document.querySelectorAll('.auth-tab');
-  tabs.forEach(t => t.classList.remove('active'));
-  event.target.classList.add('active');
+  const loginForm = document.getElementById("login-form");
+  const registerForm = document.getElementById("register-form");
+  const tabs = document.querySelectorAll(".auth-tab");
   
-  if (tab === 'login') {
-    loginForm.style.display = 'block';
-    registerForm.style.display = 'none';
+  tabs.forEach(t => t.classList.remove("active"));
+  event.target.classList.add("active");
+  
+  if (tab === "login") {
+    loginForm.style.display = "flex";
+    registerForm.style.display = "none";
   } else {
-    loginForm.style.display = 'none';
-    registerForm.style.display = 'block';
+    loginForm.style.display = "none";
+    registerForm.style.display = "flex";
   }
 }
 
 // Login Form Handler
-loginForm.addEventListener('submit', async (e) => {
+document.getElementById("login-form").addEventListener("submit", async (e) => {
   e.preventDefault();
-  const username = document.getElementById('login-username').value;
-  const password = document.getElementById('login-password').value;
+  const username = document.getElementById("login-username").value;
+  const password = document.getElementById("login-password").value;
 
   try {
-    const response = await fetch('/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+    const response = await fetch("/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ username, password })
     });
+    
     const data = await response.json();
 
     if (data.success) {
-      window.username = username;
+      currentUser = username;
       isAdmin = data.isAdmin;
-      authContainer.style.display = 'none';
-      chatWrapper.style.display = 'flex';
+      showChat();
+      socket.emit('request chat history');
+      
+      // Add admin clear button if user is admin
       if (isAdmin) {
         addAdminClearButton();
       }
-      messageInput.focus();
     } else {
-      showAlert('Invalid credentials', 'danger');
+      alert(data.error || "Login failed");
     }
   } catch (err) {
-    showAlert('Login failed', 'danger');
+    console.error('Login error:', err);
+    alert("Error during login");
   }
 });
 
-// Register Form Handler
-registerForm.addEventListener('submit', async (e) => {
+// Registration Form Handler
+document.getElementById("register-form").addEventListener("submit", async (e) => {
   e.preventDefault();
-  const username = document.getElementById('register-username').value;
-  const password = document.getElementById('register-password').value;
-  const confirmPassword = document.getElementById('confirm-password').value;
+  const username = document.getElementById("register-username").value;
+  const password = document.getElementById("register-password").value;
+  const confirmPassword = document.getElementById("confirm-password").value;
 
   if (password !== confirmPassword) {
-    showAlert('Passwords do not match', 'danger');
+    alert("Passwords do not match!");
     return;
   }
 
   try {
-    const response = await fetch('/register', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+    const response = await fetch("/register", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ username, password })
     });
+    
     const data = await response.json();
 
     if (data.success) {
-      showAlert('Registration successful! Please login.', 'success');
-      showTab('login');
+      alert("Registration successful! Please login.");
+      showTab("login");
     } else {
-      showAlert(data.error || 'Registration failed', 'danger');
+      alert(data.error || "Registration failed");
     }
   } catch (err) {
-    showAlert('Registration failed', 'danger');
+    alert("Error during registration");
   }
 });
 
-// Send Message
-function sendMessage() {
-  const message = messageInput.value.trim();
-  if (message) {
-    socket.emit('chat message', { user: username, msg: message });
-    messageInput.value = '';
-    messageInput.focus();
+function showChat() {
+  authContainer.style.display = "none";
+  chatWrapper.style.display = "flex";
+  messageInput.focus();
+}
+
+// Admin Functions
+function addAdminClearButton() {
+  // Remove existing button if any
+  const existingButton = document.getElementById('admin-clear-button');
+  if (existingButton) {
+    existingButton.remove();
+  }
+
+  const clearButton = document.createElement('button');
+  clearButton.id = 'admin-clear-button';
+  clearButton.textContent = 'Clear Chat History';
+  clearButton.style.position = 'absolute';
+  clearButton.style.top = '10px';
+  clearButton.style.right = '10px';
+  clearButton.style.padding = '5px 10px';
+  clearButton.style.background = '#dc3545';
+  clearButton.style.color = 'white';
+  clearButton.style.border = 'none';
+  clearButton.style.borderRadius = '4px';
+  clearButton.style.cursor = 'pointer';
+  clearButton.onclick = clearChatHistory;
+
+  document.querySelector('.chat-header').appendChild(clearButton);
+}
+
+async function clearChatHistory() {
+  if (!isAdmin) {
+    alert('Only administrators can clear chat history');
+    return;
+  }
+  
+  if (!confirm('Are you sure you want to clear all chat history? This action cannot be undone.')) {
+    return;
+  }
+
+  try {
+    const response = await fetch('/clear-chat-history', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: currentUser, isAdmin })
+    });
+    
+    const data = await response.json();
+    if (data.success) {
+      chatBox.innerHTML = '';
+      console.log('Chat history cleared successfully');
+    } else {
+      alert(data.error || 'Failed to clear chat history');
+    }
+  } catch (err) {
+    console.error('Error clearing chat history:', err);
+    alert('Error clearing chat history');
   }
 }
 
-// Handle Enter Key
-messageInput.addEventListener('keypress', (e) => {
-  if (e.key === 'Enter') {
-    sendMessage();
-  }
-});
+// Chat Functions
+function sendMessage() {
+  const msg = messageInput.value.trim();
+  if (!msg || !currentUser) return;
 
-// Handle Typing
-messageInput.addEventListener('input', () => {
-  socket.emit('typing', username);
-  clearTimeout(typingTimeout);
-  typingTimeout = setTimeout(() => {
-    typingStatus.textContent = '';
-  }, 1000);
-});
+  console.log('Sending message:', { user: currentUser, msg });
+  socket.emit("chat message", { user: currentUser, msg });
+  messageInput.value = "";
+}
 
-// Socket Event Handlers
-socket.on('chat message', (data) => {
-  const messageDiv = document.createElement('div');
-  messageDiv.className = `message ${data.user === username ? 'sent' : 'received'}`;
-  
-  const userSpan = document.createElement('div');
-  userSpan.className = 'user';
-  userSpan.textContent = data.user;
-  
-  const msgSpan = document.createElement('div');
-  msgSpan.className = 'msg';
-  msgSpan.textContent = data.msg;
-  
-  const timeSpan = document.createElement('div');
-  timeSpan.className = 'time';
-  timeSpan.textContent = new Date().toLocaleTimeString();
-  
-  messageDiv.appendChild(userSpan);
-  messageDiv.appendChild(msgSpan);
-  messageDiv.appendChild(timeSpan);
-  
-  chatBox.appendChild(messageDiv);
+socket.on("chat message", ({ user, msg }) => {
+  console.log('Received message:', { user, msg });
+  const msgEl = document.createElement("p");
+  msgEl.textContent = `${user}: ${msg}`;
+  msgEl.classList.add(user === currentUser ? "sent" : "received");
+  chatBox.appendChild(msgEl);
   chatBox.scrollTop = chatBox.scrollHeight;
+  typingStatus.textContent = "";
 });
 
-socket.on('typing', (user) => {
-  if (user !== username) {
+messageInput.addEventListener("input", () => {
+  if (currentUser) socket.emit("typing", currentUser);
+});
+
+socket.on("typing", (user) => {
+  if (user !== currentUser) {
     typingStatus.textContent = `${user} is typing...`;
+    setTimeout(() => {
+      typingStatus.textContent = "";
+    }, 2000);
   }
 });
 
-socket.on('chat history', (messages) => {
-  chatBox.innerHTML = '';
-  messages.forEach(data => {
-    const messageDiv = document.createElement('div');
-    messageDiv.className = `message ${data.user === username ? 'sent' : 'received'}`;
-    
-    const userSpan = document.createElement('div');
-    userSpan.className = 'user';
-    userSpan.textContent = data.user;
-    
-    const msgSpan = document.createElement('div');
-    msgSpan.className = 'msg';
-    msgSpan.textContent = data.msg;
-    
-    const timeSpan = document.createElement('div');
-    timeSpan.className = 'time';
-    timeSpan.textContent = new Date(data.created_at).toLocaleTimeString();
-    
-    messageDiv.appendChild(userSpan);
-    messageDiv.appendChild(msgSpan);
-    messageDiv.appendChild(timeSpan);
-    
-    chatBox.appendChild(messageDiv);
+socket.on("chat history", (messages) => {
+  console.log('Received chat history:', messages);
+  if (!Array.isArray(messages)) {
+    console.error('Chat history is not an array:', messages);
+    return;
+  }
+  
+  chatBox.innerHTML = "";
+  messages.forEach(({ user, msg }) => {
+    console.log('Processing message:', { user, msg });
+    const msgEl = document.createElement("p");
+    msgEl.textContent = `${user}: ${msg}`;
+    msgEl.classList.add(user === currentUser ? "sent" : "received");
+    chatBox.appendChild(msgEl);
   });
   chatBox.scrollTop = chatBox.scrollHeight;
 });
 
 // Logout Function
 function logout() {
-  window.username = '';
+  currentUser = null;
   isAdmin = false;
-  authContainer.style.display = 'flex';
-  chatWrapper.style.display = 'none';
-  chatBox.innerHTML = '';
-  document.getElementById('login-username').value = '';
-  document.getElementById('login-password').value = '';
-  document.getElementById('register-username').value = '';
-  document.getElementById('register-password').value = '';
-  document.getElementById('confirm-password').value = '';
-  showTab('login');
-}
-
-// Add Admin Clear Button
-function addAdminClearButton() {
-  const clearButton = document.createElement('button');
-  clearButton.className = 'btn btn-danger btn-sm admin-clear-btn';
-  clearButton.innerHTML = '<i class="fas fa-trash-alt me-1"></i>Clear Chat';
-  clearButton.onclick = clearChatHistory;
-  chatWrapper.appendChild(clearButton);
-}
-
-// Clear Chat History
-async function clearChatHistory() {
-  if (!isAdmin) return;
+  chatWrapper.style.display = "none";
+  authContainer.style.display = "block";
+  document.getElementById("login-form").reset();
+  document.getElementById("register-form").reset();
   
-  if (confirm('Are you sure you want to clear all chat history?')) {
-    try {
-      const response = await fetch('/clear-chat-history', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, isAdmin })
-      });
-      const data = await response.json();
-      
-      if (data.success) {
-        chatBox.innerHTML = '';
-        showAlert('Chat history cleared', 'success');
-      } else {
-        showAlert('Failed to clear chat history', 'danger');
-      }
-    } catch (err) {
-      showAlert('Failed to clear chat history', 'danger');
-    }
+  // Remove admin clear button if it exists
+  const clearButton = document.getElementById('admin-clear-button');
+  if (clearButton) {
+    clearButton.remove();
   }
-}
-
-// Show Alert
-function showAlert(message, type) {
-  const alertDiv = document.createElement('div');
-  alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
-  alertDiv.role = 'alert';
-  alertDiv.innerHTML = `
-    ${message}
-    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-  `;
-  
-  const container = document.querySelector('.auth-box');
-  container.insertBefore(alertDiv, container.firstChild);
-  
-  setTimeout(() => {
-    alertDiv.remove();
-  }, 3000);
 }
