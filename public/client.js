@@ -42,11 +42,13 @@ document.getElementById("login-form").addEventListener("submit", async (e) => {
     if (data.success) {
       currentUser = username;
       showChat();
+      console.log('Requesting chat history after login...');
       socket.emit('request chat history');
     } else {
       alert(data.error || "Login failed");
     }
   } catch (err) {
+    console.error('Login error:', err);
     alert("Error during login");
   }
 });
@@ -131,8 +133,14 @@ socket.on("typing", (user) => {
 
 socket.on("chat history", (messages) => {
   console.log('Received chat history:', messages);
+  if (!Array.isArray(messages)) {
+    console.error('Chat history is not an array:', messages);
+    return;
+  }
+  
   chatBox.innerHTML = "";
   messages.forEach(({ user, msg }) => {
+    console.log('Processing message:', { user, msg });
     const msgEl = document.createElement("p");
     msgEl.textContent = `${user}: ${msg}`;
     msgEl.classList.add(user === currentUser ? "sent" : "received");
