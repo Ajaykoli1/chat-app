@@ -320,6 +320,12 @@ fileInput.addEventListener('change', async (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
+    console.log('File selected:', {
+        name: file.name,
+        type: file.type,
+        size: file.size
+    });
+
     // Check file size (5MB limit)
     if (file.size > 5 * 1024 * 1024) {
         alert('File size must be less than 5MB');
@@ -330,18 +336,23 @@ fileInput.addEventListener('change', async (e) => {
     formData.append('file', file);
     formData.append('username', currentUser);
 
+    console.log('Sending file upload request...');
+
     try {
         const response = await fetch('/upload', {
             method: 'POST',
             body: formData
         });
 
+        console.log('Upload response status:', response.status);
         const data = await response.json();
+        console.log('Upload response data:', data);
+
         if (data.success) {
             // Emit the file message
             socket.emit('chat message', {
-                username: currentUser,
-                message: data.fileUrl,
+                user: currentUser,
+                msg: data.fileUrl,
                 fileUrl: data.fileUrl,
                 fileName: data.fileName,
                 fileType: data.fileType
@@ -350,7 +361,7 @@ fileInput.addEventListener('change', async (e) => {
             alert('Error uploading file: ' + data.error);
         }
     } catch (error) {
-        console.error('Error:', error);
+        console.error('Error during file upload:', error);
         alert('Error uploading file');
     }
 

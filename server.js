@@ -71,20 +71,37 @@ pool.connect((err, client, release) => {
 
 // Serve static files from the public folder
 app.use(express.static('public'));
+app.use('/uploads', express.static('public/uploads'));
 
 // File upload endpoint
 app.post('/upload', upload.single('file'), (req, res) => {
+  console.log('File upload request received:', req.file);
+  
   if (!req.file) {
+    console.error('No file in request');
     return res.status(400).json({ error: 'No file uploaded' });
   }
   
-  const fileUrl = `/uploads/${req.file.filename}`;
-  res.json({
-    success: true,
-    fileUrl: fileUrl,
-    fileName: req.file.originalname,
-    fileType: req.file.mimetype
-  });
+  try {
+    const fileUrl = `/uploads/${req.file.filename}`;
+    console.log('File uploaded successfully:', {
+      filename: req.file.filename,
+      originalname: req.file.originalname,
+      mimetype: req.file.mimetype,
+      size: req.file.size,
+      path: req.file.path
+    });
+    
+    res.json({
+      success: true,
+      fileUrl: fileUrl,
+      fileName: req.file.originalname,
+      fileType: req.file.mimetype
+    });
+  } catch (error) {
+    console.error('Error processing file upload:', error);
+    res.status(500).json({ error: 'Error processing file upload' });
+  }
 });
 
 // Registration endpoint
