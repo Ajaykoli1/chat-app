@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS users (
 -- Create messages table
 CREATE TABLE IF NOT EXISTS messages (
     id SERIAL PRIMARY KEY,
-    user VARCHAR(50) NOT NULL,
+    "user" VARCHAR(50) NOT NULL,
     msg TEXT NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ); 
