@@ -156,63 +156,18 @@ async function clearChatHistory() {
 // Chat Functions
 function sendMessage() {
   const msg = messageInput.value.trim();
-  if (!currentUser) return;
+  if (!msg || !currentUser) return;
 
-  if (msg) {
-    console.log('Sending message:', { user: currentUser, msg });
-    socket.emit("chat message", { user: currentUser, msg });
-    messageInput.value = "";
-  }
+  console.log('Sending message:', { user: currentUser, msg });
+  socket.emit("chat message", { user: currentUser, msg });
+  messageInput.value = "";
 }
 
-socket.on("chat message", ({ user, msg, file_url, file_name, file_type }) => {
-  console.log('Received message:', { user, msg, file_url, file_name, file_type });
-  const msgEl = document.createElement("div");
-  msgEl.className = `message ${user === currentUser ? "sent" : "received"}`;
-  
-  const header = document.createElement("div");
-  header.className = "message-header";
-  header.textContent = user;
-  msgEl.appendChild(header);
-
-  if (file_url) {
-    const fileContent = document.createElement("div");
-    fileContent.className = "file-content";
-
-    if (file_type.startsWith('image/')) {
-      const img = document.createElement("img");
-      img.src = file_url;
-      img.className = "file-preview";
-      img.alt = file_name;
-      fileContent.appendChild(img);
-    } else {
-      const fileAttachment = document.createElement("div");
-      fileAttachment.className = "file-attachment";
-      
-      const icon = document.createElement("img");
-      icon.src = getFileIcon(file_type);
-      icon.alt = "File icon";
-      
-      const link = document.createElement("a");
-      link.href = file_url;
-      link.textContent = file_name;
-      link.target = "_blank";
-      
-      fileAttachment.appendChild(icon);
-      fileAttachment.appendChild(link);
-      fileContent.appendChild(fileAttachment);
-    }
-    
-    msgEl.appendChild(fileContent);
-  }
-
-  if (msg) {
-    const content = document.createElement("div");
-    content.className = "message-content";
-    content.textContent = msg;
-    msgEl.appendChild(content);
-  }
-
+socket.on("chat message", ({ user, msg }) => {
+  console.log('Received message:', { user, msg });
+  const msgEl = document.createElement("p");
+  msgEl.textContent = `${user}: ${msg}`;
+  msgEl.classList.add(user === currentUser ? "sent" : "received");
   chatBox.appendChild(msgEl);
   chatBox.scrollTop = chatBox.scrollHeight;
   typingStatus.textContent = "";
@@ -239,54 +194,11 @@ socket.on("chat history", (messages) => {
   }
   
   chatBox.innerHTML = "";
-  messages.forEach(({ user, msg, file_url, file_name, file_type }) => {
-    console.log('Processing message:', { user, msg, file_url, file_name, file_type });
-    const msgEl = document.createElement("div");
-    msgEl.className = `message ${user === currentUser ? "sent" : "received"}`;
-    
-    const header = document.createElement("div");
-    header.className = "message-header";
-    header.textContent = user;
-    msgEl.appendChild(header);
-
-    if (file_url) {
-      const fileContent = document.createElement("div");
-      fileContent.className = "file-content";
-
-      if (file_type.startsWith('image/')) {
-        const img = document.createElement("img");
-        img.src = file_url;
-        img.className = "file-preview";
-        img.alt = file_name;
-        fileContent.appendChild(img);
-      } else {
-        const fileAttachment = document.createElement("div");
-        fileAttachment.className = "file-attachment";
-        
-        const icon = document.createElement("img");
-        icon.src = getFileIcon(file_type);
-        icon.alt = "File icon";
-        
-        const link = document.createElement("a");
-        link.href = file_url;
-        link.textContent = file_name;
-        link.target = "_blank";
-        
-        fileAttachment.appendChild(icon);
-        fileAttachment.appendChild(link);
-        fileContent.appendChild(fileAttachment);
-      }
-      
-      msgEl.appendChild(fileContent);
-    }
-
-    if (msg) {
-      const content = document.createElement("div");
-      content.className = "message-content";
-      content.textContent = msg;
-      msgEl.appendChild(content);
-    }
-
+  messages.forEach(({ user, msg }) => {
+    console.log('Processing message:', { user, msg });
+    const msgEl = document.createElement("p");
+    msgEl.textContent = `${user}: ${msg}`;
+    msgEl.classList.add(user === currentUser ? "sent" : "received");
     chatBox.appendChild(msgEl);
   });
   chatBox.scrollTop = chatBox.scrollHeight;
@@ -306,125 +218,4 @@ function logout() {
   if (clearButton) {
     clearButton.remove();
   }
-}
-
-// Add file upload handling
-const fileInput = document.getElementById('file-input');
-const fileBtn = document.querySelector('.file-btn');
-
-fileBtn.addEventListener('click', () => {
-    fileInput.click();
-});
-
-fileInput.addEventListener('change', async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    console.log('File selected:', {
-        name: file.name,
-        type: file.type,
-        size: file.size
-    });
-
-    // Check file size (5MB limit)
-    if (file.size > 5 * 1024 * 1024) {
-        alert('File size must be less than 5MB');
-        return;
-    }
-
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('username', currentUser);
-
-    console.log('Sending file upload request...');
-
-    try {
-        const response = await fetch('/upload', {
-            method: 'POST',
-            body: formData
-        });
-
-        console.log('Upload response status:', response.status);
-        const data = await response.json();
-        console.log('Upload response data:', data);
-
-        if (data.success) {
-            // Emit the file message
-            socket.emit('chat message', {
-                user: currentUser,
-                msg: data.fileUrl,
-                fileUrl: data.fileUrl,
-                fileName: data.fileName,
-                fileType: data.fileType
-            });
-        } else {
-            alert('Error uploading file: ' + data.error);
-        }
-    } catch (error) {
-        console.error('Error during file upload:', error);
-        alert('Error uploading file');
-    }
-
-    // Clear the file input
-    fileInput.value = '';
-});
-
-// Update the message display function to handle files
-function addMessage(msg) {
-    const messageDiv = document.createElement('div');
-    messageDiv.className = `message ${msg.username === currentUser ? 'sent' : 'received'}`;
-    
-    const header = document.createElement('div');
-    header.className = 'message-header';
-    header.textContent = msg.username;
-    messageDiv.appendChild(header);
-
-    if (msg.fileUrl) {
-        const fileContent = document.createElement('div');
-        fileContent.className = 'file-content';
-
-        if (msg.fileType.startsWith('image/')) {
-            const img = document.createElement('img');
-            img.src = msg.fileUrl;
-            img.className = 'file-preview';
-            img.alt = msg.fileName;
-            fileContent.appendChild(img);
-        } else {
-            const fileAttachment = document.createElement('div');
-            fileAttachment.className = 'file-attachment';
-            
-            const icon = document.createElement('img');
-            icon.src = getFileIcon(msg.fileType);
-            icon.alt = 'File icon';
-            
-            const link = document.createElement('a');
-            link.href = msg.fileUrl;
-            link.textContent = msg.fileName;
-            link.target = '_blank';
-            
-            fileAttachment.appendChild(icon);
-            fileAttachment.appendChild(link);
-            fileContent.appendChild(fileAttachment);
-        }
-        
-        messageDiv.appendChild(fileContent);
-    }
-
-    if (msg.message) {
-        const content = document.createElement('div');
-        content.className = 'message-content';
-        content.textContent = msg.message;
-        messageDiv.appendChild(content);
-    }
-
-    chatBox.appendChild(messageDiv);
-    chatBox.scrollTop = chatBox.scrollHeight;
-}
-
-// Helper function to get file icon based on type
-function getFileIcon(fileType) {
-    if (fileType.startsWith('image/')) return '/icons/image.png';
-    if (fileType === 'application/pdf') return '/icons/pdf.png';
-    if (fileType.includes('document') || fileType.includes('text')) return '/icons/document.png';
-    return '/icons/file.png';
 }

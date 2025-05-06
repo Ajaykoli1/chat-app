@@ -3,9 +3,6 @@ const http = require('http');
 const socketIo = require('socket.io');
 const { Pool } = require('pg');
 const bcrypt = require('bcryptjs');
-const multer = require('multer');
-const path = require('path');
-const fs = require('fs');
 require('dotenv').config();
 
 const app = express();
@@ -13,45 +10,6 @@ const server = http.createServer(app);
 const io = socketIo(server);
 
 app.use(express.json());
-
-// Configure multer for file uploads
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    const uploadDir = 'public/uploads';
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true });
-    }
-    cb(null, uploadDir);
-  },
-  filename: function (req, file, cb) {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, uniqueSuffix + path.extname(file.originalname));
-  }
-});
-
-const upload = multer({
-  storage: storage,
-  limits: {
-    fileSize: 5 * 1024 * 1024 // 5MB limit
-  },
-  fileFilter: function (req, file, cb) {
-    // Allow images and common document types
-    const allowedTypes = [
-      'image/jpeg',
-      'image/png',
-      'image/gif',
-      'application/pdf',
-      'application/msword',
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      'text/plain'
-    ];
-    if (allowedTypes.includes(file.mimetype)) {
-      cb(null, true);
-    } else {
-      cb(new Error('Invalid file type'));
-    }
-  }
-});
 
 // PostgreSQL connection setup
 const pool = new Pool({
@@ -72,37 +30,6 @@ pool.connect((err, client, release) => {
 // Serve static files from the public folder
 app.use(express.static('public'));
 app.use('/uploads', express.static('public/uploads'));
-
-// File upload endpoint
-app.post('/upload', upload.single('file'), (req, res) => {
-  console.log('File upload request received:', req.file);
-  
-  if (!req.file) {
-    console.error('No file in request');
-    return res.status(400).json({ error: 'No file uploaded' });
-  }
-  
-  try {
-    const fileUrl = `/uploads/${req.file.filename}`;
-    console.log('File uploaded successfully:', {
-      filename: req.file.filename,
-      originalname: req.file.originalname,
-      mimetype: req.file.mimetype,
-      size: req.file.size,
-      path: req.file.path
-    });
-    
-    res.json({
-      success: true,
-      fileUrl: fileUrl,
-      fileName: req.file.originalname,
-      fileType: req.file.mimetype
-    });
-  } catch (error) {
-    console.error('Error processing file upload:', error);
-    res.status(500).json({ error: 'Error processing file upload' });
-  }
-});
 
 // Registration endpoint
 app.post('/register', async (req, res) => {
